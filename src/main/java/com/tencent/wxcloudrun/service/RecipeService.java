@@ -1,0 +1,16 @@
+package com.tencent.wxcloudrun.service;
+import com.tencent.wxcloudrun.dao.RecipeMapper; import org.springframework.stereotype.Service; import org.springframework.transaction.annotation.Transactional;
+import java.util.*;
+@Service public class RecipeService {
+ private final RecipeMapper mapper; public RecipeService(RecipeMapper mapper){this.mapper=mapper;}
+ private String user(String u){return u==null||u.trim().isEmpty()?"dev-user":u;}
+ public List<Map<String,Object>> list(String u, Map<String,Object> q){q.put("userOpenid",user(u)); return mapper.list(q);}
+ public Map<String,Object> detail(String u,Long id){Map<String,Object> p=new HashMap<>();p.put("userOpenid",user(u));p.put("id",id);Map<String,Object> r=mapper.find(p);if(r!=null){r.put("ingredients",mapper.ingredients(id));r.put("steps",mapper.steps(id));r.put("images",mapper.images(id));}return r;}
+ @Transactional public Map<String,Object> create(String u,Map<String,Object> body){String open=user(u);mapper.upsertUser(open);body.put("userOpenid",open);body.putIfAbsent("isPublic",1);body.putIfAbsent("title",body.get("name"));body.putIfAbsent("categoryName",body.get("category"));mapper.insertRecipe(body);Long id=((Number)body.get("id")).longValue(); addChildren(body.get("ingredients"),id,"ingredient");addChildren(body.get("steps"),id,"step");addChildren(body.get("images"),id,"image");return detail(open,id);}
+ private void addChildren(Object value,Long id,String type){if(!(value instanceof List))return; int order=0; for(Object o:(List)value){Map m=new HashMap();m.put("recipeId",id); if(o instanceof Map)m.putAll((Map)o); else if("ingredient".equals(type))m.put("name",String.valueOf(o)); else if("step".equals(type))m.put("content",String.valueOf(o)); if("ingredient".equals(type)){m.putIfAbsent("sortOrder",order++);mapper.insertIngredient(m);}else if("step".equals(type)){m.putIfAbsent("stepNo",order++ + 1);mapper.insertStep(m);}else{m.putIfAbsent("sortOrder",order++);mapper.insertImage(m);}}}
+ @Transactional public boolean favorite(String u,Long id){Map<String,Object> p=new HashMap<>();p.put("userOpenid",user(u));p.put("recipeId",id);if(mapper.favoriteCount(p)>0){mapper.removeFavorite(p);return false;}mapper.addFavorite(p);return true;}
+ public List<Map<String,Object>> records(String u){Map<String,Object> p=new HashMap<>();p.put("userOpenid",user(u));return mapper.records(p);}
+ @Transactional public Map<String,Object> addRecord(String u,Map<String,Object> b){b.put("userOpenid",user(u));mapper.addRecord(b);return b;}
+ @Transactional public void clearRecords(String u){mapper.clearRecords(user(u));}
+ public Map<String,Object> statistics(String u){String open=user(u);Map<String,Object> r=new LinkedHashMap<>();r.put("recipeCount",mapper.countRecipes(open));r.put("favoriteCount",mapper.countFavorites(open));r.put("cookingRecordCount",mapper.countRecords(open));return r;}
+}
