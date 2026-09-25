@@ -8,7 +8,7 @@
 <insert id="insertImage">INSERT INTO recipe_images(recipe_id,image_url,sort_order) VALUES(#{recipeId},#{imageUrl},#{sortOrder})</insert>
 <select id="favoriteCount" resultType="int">SELECT COUNT(*) FROM recipe_favorites WHERE user_openid=#{userOpenid} AND recipe_id=#{recipeId}</select>
 <insert id="addFavorite">INSERT IGNORE INTO recipe_favorites(user_openid,recipe_id) VALUES(#{userOpenid},#{recipeId})</insert><delete id="removeFavorite">DELETE FROM recipe_favorites WHERE user_openid=#{userOpenid} AND recipe_id=#{recipeId}</delete>
-<select id="records" resultType="map">SELECT cr.*,r.cover_url FROM cooking_records cr LEFT JOIN recipes r ON r.id=cr.recipe_id WHERE cr.user_openid=#{userOpenid} ORDER BY cr.cooked_at DESC</select>
+<select id="records" resultType="map">SELECT cr.*, COALESCE(cr.recipe_title,r.title) AS name, r.cover_url, r.cover_url AS coverUrl FROM cooking_records cr LEFT JOIN recipes r ON r.id=cr.recipe_id WHERE cr.user_openid=#{userOpenid} ORDER BY cr.cooked_at DESC</select>
 <insert id="addRecord" useGeneratedKeys="true" keyProperty="id">INSERT INTO cooking_records(user_openid,recipe_id,recipe_title,cooked_at,note) VALUES(#{userOpenid},#{recipeId},#{recipeTitle},COALESCE(#{cookedAt},CURRENT_TIMESTAMP),#{note})</insert><delete id="clearRecords">DELETE FROM cooking_records WHERE user_openid=#{openid}</delete>
 <select id="countRecipes" resultType="int">SELECT COUNT(*) FROM recipes WHERE user_openid=#{openid}</select><select id="countFavorites" resultType="int">SELECT COUNT(*) FROM recipe_favorites WHERE user_openid=#{openid}</select><select id="countRecords" resultType="int">SELECT COUNT(*) FROM cooking_records WHERE user_openid=#{openid}</select>
 </mapper>
