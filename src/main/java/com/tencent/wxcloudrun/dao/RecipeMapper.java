@@ -10,5 +10,7 @@ import java.util.List; import java.util.Map;
  List<Map<String,Object>> records(Map<String,Object> p); int addRecord(Map<String,Object> p); int clearRecords(@Param("openid") String openid);
  int countRecipes(@Param("openid") String openid); int countFavorites(@Param("openid") String openid); int countRecords(@Param("openid") String openid);
  int upsertUser(@Param("openid") String openid);
+ Map<String,Object> findUserProfile(@Param("openid") String openid);
+ int saveUserProfile(Map<String,Object> profile);
  List<Map<String,Object>> categories(@Param("openid") String openid); int categoryExists(Map<String,Object> p); int insertCategory(Map<String,Object> p);
 }
