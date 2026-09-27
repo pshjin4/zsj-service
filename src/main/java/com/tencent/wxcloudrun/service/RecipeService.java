@@ -4,6 +4,9 @@ import java.util.*;
 @Service public class RecipeService {
  private final RecipeMapper mapper; public RecipeService(RecipeMapper mapper){this.mapper=mapper;}
  private String user(String u){return u==null||u.trim().isEmpty()?"dev-user":u;}
+ public List<Map<String,Object>> categories(String u){return mapper.categories(user(u));}
+ @Transactional public Map<String,Object> createCategory(String u,String name){String open=user(u);String clean=name==null?"":name.trim();if(clean.isEmpty()||clean.length()>30)throw new IllegalArgumentException("分类名称需为1至30个字符");Map<String,Object> p=new HashMap<>();p.put("openid",open);p.put("name",clean);if(mapper.categoryExists(p)>0)throw new IllegalArgumentException("分类已存在");mapper.insertCategory(p);Map<String,Object> result=new HashMap<>();result.put("name",clean);return result;}
+ public boolean categoryExists(String u,String name){Map<String,Object> p=new HashMap<>();p.put("openid",user(u));p.put("name",name);return mapper.categoryExists(p)>0;}
  public List<Map<String,Object>> list(String u, Map<String,Object> q){q.put("userOpenid",user(u)); return mapper.list(q);}
  public Map<String,Object> detail(String u,Long id){Map<String,Object> p=new HashMap<>();p.put("userOpenid",user(u));p.put("id",id);Map<String,Object> r=mapper.find(p);if(r!=null){r.put("ingredients",mapper.ingredients(id));r.put("steps",mapper.steps(id));r.put("images",mapper.images(id));}return r;}
  @Transactional public Map<String,Object> create(String u,Map<String,Object> body){String open=user(u);mapper.upsertUser(open);body.put("userOpenid",open);body.putIfAbsent("isPublic",1);body.putIfAbsent("title",body.get("name"));body.putIfAbsent("categoryName",body.get("category"));mapper.insertRecipe(body);Long id=((Number)body.get("id")).longValue(); addChildren(body.get("ingredients"),id,"ingredient");addChildren(body.get("steps"),id,"step");addChildren(body.get("images"),id,"image");return detail(open,id);}
