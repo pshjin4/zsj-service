@@ -14,7 +14,9 @@ import com.tencent.wxcloudrun.config.ApiResponse; import com.tencent.wxcloudrun.
  @DeleteMapping("/recipes/{id}") public ApiResponse delete(@RequestHeader(value="X-WX-OPENID",required=false)String u,@PathVariable Long id){service.delete(u,id);return ApiResponse.ok();}
  @PostMapping("/recipes/{id}/favorite") public ApiResponse favorite(@RequestHeader(value="X-WX-OPENID",required=false)String u,@PathVariable Long id){Map<String,Object>r=new HashMap<>();r.put("favorited",service.favorite(user(u),id));return ApiResponse.ok(r);}
  @GetMapping("/cooking-records") public ApiResponse records(@RequestHeader(value="X-WX-OPENID",required=false)String u){return ApiResponse.ok(service.records(user(u)));}
+ @GetMapping("/cooking-records/{id}") public ApiResponse cookingRecord(@RequestHeader(value="X-WX-OPENID",required=false)String u,@PathVariable Long id){return ApiResponse.ok(service.cookingRecord(user(u),id));}
  @PostMapping("/cooking-records") public ApiResponse addRecord(@RequestHeader(value="X-WX-OPENID",required=false)String u,@RequestBody Map<String,Object>b){return ApiResponse.ok(service.addRecord(user(u),b));}
+ @PutMapping("/cooking-records/{id}") public ApiResponse updateCookingRecord(@RequestHeader(value="X-WX-OPENID",required=false)String u,@PathVariable Long id,@RequestBody Map<String,Object>b){return ApiResponse.ok(service.updateCookingRecord(user(u),id,b));}
  @DeleteMapping("/cooking-records") public ApiResponse clear(@RequestHeader(value="X-WX-OPENID",required=false)String u){service.clearRecords(user(u));return ApiResponse.ok();}
  @GetMapping("/statistics") public ApiResponse statistics(@RequestHeader(value="X-WX-OPENID",required=false)String u){return ApiResponse.ok(service.statistics(user(u)));}
  @GetMapping("/recipes/count") public ApiResponse recipeCount(@RequestHeader(value="X-WX-OPENID",required=false)String u){return ApiResponse.ok(service.statistics(user(u)).get("recipeCount"));}
