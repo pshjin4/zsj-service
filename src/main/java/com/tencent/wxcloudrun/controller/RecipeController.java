@@ -2,7 +2,7 @@ package com.tencent.wxcloudrun.controller;
 import com.tencent.wxcloudrun.config.ApiResponse; import com.tencent.wxcloudrun.service.RecipeService; import org.springframework.web.bind.annotation.*; import java.util.*;
 @RestController @RequestMapping("/api") public class RecipeController {
  private final RecipeService service; public RecipeController(RecipeService service){this.service=service;}
- private String user(String h){return h==null||h.trim().isEmpty()?"dev-user":h;}
+ private String user(String h){if(h==null||h.trim().isEmpty())throw new IllegalArgumentException("无法确认微信用户身份，请重新进入小程序");return h;}
  @GetMapping("/users/me") public ApiResponse profile(@RequestHeader(value="X-WX-OPENID",required=false)String u){return ApiResponse.ok(service.userProfile(u));}
  @PostMapping("/users/me") public ApiResponse saveProfile(@RequestHeader(value="X-WX-OPENID",required=false)String u,@RequestBody Map<String,Object>b){return ApiResponse.ok(service.saveUserProfile(u,b.get("nickname")==null?"":String.valueOf(b.get("nickname")),b.get("avatarUrl")==null?"":String.valueOf(b.get("avatarUrl"))));}
  @GetMapping("/recipe-categories") public ApiResponse categories(@RequestHeader(value="X-WX-OPENID",required=false)String u){return ApiResponse.ok(service.categories(user(u)));}
