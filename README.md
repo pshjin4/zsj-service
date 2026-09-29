@@ -7,7 +7,7 @@
 - `WECHAT_MINIAPP_APPID`：小程序 AppID
 - `WECHAT_MINIAPP_SECRET`：小程序 AppSecret（只保存在云托管环境变量中，不要提交到代码仓库）
 
-小程序通过 `wx.cloud.callContainer` 调用此接口，云托管注入的 `X-WX-OPENID` 用于微信 `msg_sec_check` / `img_sec_check`。服务端缓存 access_token，并仅返回审核是否通过；用户文本、图片、OpenID 和 access_token 不写入日志。检测失败时按失败关闭处理，不保存未完成检测的内容。
+小程序通过 `wx.cloud.callContainer` 调用此接口，云托管注入的 `X-WX-OPENID` 用于微信 `msg_sec_check` / `img_sec_check`。图片先上传到当前 CloudBase 环境，检测请求只携带 `fileID`，服务端经 `tcb/batchdownloadfile` 获取图片临时下载链接后送检，避免把图片 Base64 放进云托管请求体。未通过检测或检测失败的临时图片会由小程序删除。服务端缓存 access_token，并仅返回审核是否通过；用户文本、图片、OpenID 和 access_token 不写入日志。检测失败时按失败关闭处理，不保存未完成检测的内容。
 [![GitHub license](https://img.shields.io/github/license/WeixinCloud/wxcloudrun-express)](https://github.com/WeixinCloud/wxcloudrun-express)
 ![GitHub package.json dependency version (prod)](https://img.shields.io/badge/maven-3.6.0-green)
 ![GitHub package.json dependency version (prod)](https://img.shields.io/badge/jdk-11-green)

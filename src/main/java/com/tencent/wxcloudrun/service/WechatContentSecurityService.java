@@ -17,7 +17,6 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +26,7 @@ public class WechatContentSecurityService {
     private static final int MAX_IMAGE_BYTES = 1024 * 1024;
     private static final int TEXT_CHUNK_SIZE = 2000;
     private static final String WECHAT_API = "https://api.weixin.qq.com";
+    private static final String CLOUD_ENV_ID = "prod-d3gn4j2r46c8daa7e";
 
     @Value("${WECHAT_MINIAPP_APPID:}")
     private String appId;
@@ -86,14 +86,31 @@ public class WechatContentSecurityService {
     }
 
     private Map<String, Object> checkImage(Map<String, Object> request, String openid) {
-        Object encoded = request.get("imageBase64");
-        if (!(encoded instanceof String) || ((String) encoded).isEmpty()) throw new IllegalArgumentException("待检测图片无效");
-        byte[] image;
-        try {
-            image = Base64.getDecoder().decode((String) encoded);
-        } catch (IllegalArgumentException exception) {
-            throw new IllegalArgumentException("待检测图片无效");
+        Object fileIdValue = request.get("fileID");
+        if (!(fileIdValue instanceof String)) throw new IllegalArgumentException("待检测图片无效");
+        String fileId = (String) fileIdValue;
+        if (!fileId.startsWith("cloud://" + CLOUD_ENV_ID + ".")) throw new IllegalArgumentException("待检测图片无效");
+        Map<String, Object> fileRequest = new java.util.HashMap<>();
+        fileRequest.put("env", CLOUD_ENV_ID);
+        Map<String, Object> fileItem = new java.util.HashMap<>();
+        fileItem.put("fileid", fileId);
+        fileItem.put("max_age", 600);
+        fileRequest.put("file_list", Collections.singletonList(fileItem));
+        Map<String, Object> fileResponse = postForMap(apiUrl("/tcb/batchdownloadfile"), fileRequest);
+        classify(fileResponse);
+        Object fileListValue = fileResponse.get("file_list");
+        if (!(fileListValue instanceof List) || ((List<?>) fileListValue).isEmpty()) {
+            throw new SafeCheckException("CLOUD_FILE_URL_MISSING");
         }
+        Object itemValue = ((List<?>) fileListValue).get(0);
+        if (!(itemValue instanceof Map)) throw new SafeCheckException("CLOUD_FILE_URL_MISSING");
+        Map<?, ?> fileResult = (Map<?, ?>) itemValue;
+        int fileStatus = number(fileResult.get("status"), 0);
+        if (fileStatus != 0) throw new SafeCheckException("CLOUD_FILE_ERROR_" + fileStatus);
+        Object downloadUrlValue = fileResult.get("download_url");
+        if (!(downloadUrlValue instanceof String)) throw new SafeCheckException("CLOUD_FILE_URL_MISSING");
+        byte[] image = restTemplate.getForObject((String) downloadUrlValue, byte[].class);
+        if (image == null) throw new SafeCheckException("CLOUD_FILE_EMPTY");
         if (image.length == 0 || image.length > MAX_IMAGE_BYTES) throw new IllegalArgumentException("图片大小超出限制");
         String contentType = detectImageType(image);
 
