@@ -1,5 +1,7 @@
 package com.tencent.wxcloudrun.service;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpEntity;
@@ -33,6 +35,7 @@ public class WechatContentSecurityService {
     private String appSecret;
 
     private final RestTemplate restTemplate = new RestTemplate();
+    private final ObjectMapper objectMapper = new ObjectMapper();
     private volatile String accessToken;
     private volatile long accessTokenExpiresAt;
 
@@ -74,8 +77,7 @@ public class WechatContentSecurityService {
                 body.put("version", 2);
                 body.put("scene", scene);
                 body.put("openid", openid);
-                Map<String, Object> result = restTemplate.postForObject(
-                        apiUrl("/wxa/msg_sec_check"), body, Map.class);
+                Map<String, Object> result = postForMap(apiUrl("/wxa/msg_sec_check"), body);
                 Map<String, Object> mapped = classify(result);
                 if ("CONTENT_RISK".equals(mapped.get("code"))) return mapped;
             }
@@ -107,8 +109,8 @@ public class WechatContentSecurityService {
         form.add("openid", openid);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.MULTIPART_FORM_DATA);
-        Map<String, Object> result = restTemplate.postForObject(
-                apiUrl("/wxa/img_sec_check"), new HttpEntity<>(form, headers), Map.class);
+        Map<String, Object> result = postForMap(
+                apiUrl("/wxa/img_sec_check"), new HttpEntity<>(form, headers));
         return classify(result);
     }
 
@@ -122,7 +124,7 @@ public class WechatContentSecurityService {
                 .queryParam("appid", appId)
                 .queryParam("secret", appSecret)
                 .toUriString();
-        Map<String, Object> tokenResponse = restTemplate.getForObject(url, Map.class);
+        Map<String, Object> tokenResponse = getForMap(url);
         if (tokenResponse == null || tokenResponse.get("access_token") == null) {
             int errcode = tokenResponse == null ? -1 : number(tokenResponse.get("errcode"), -1);
             throw new SafeCheckException("WX_TOKEN_ERROR_" + errcode);
@@ -136,6 +138,25 @@ public class WechatContentSecurityService {
     private String apiUrl(String path) {
         return UriComponentsBuilder.fromHttpUrl(WECHAT_API + path)
                 .queryParam("access_token", getAccessToken()).toUriString();
+    }
+
+    private Map<String, Object> getForMap(String url) {
+        String body = restTemplate.getForObject(url, String.class);
+        return parseJsonObject(body);
+    }
+
+    private Map<String, Object> postForMap(String url, Object request) {
+        String body = restTemplate.postForObject(url, request, String.class);
+        return parseJsonObject(body);
+    }
+
+    private Map<String, Object> parseJsonObject(String body) {
+        if (body == null || body.trim().isEmpty()) throw new SafeCheckException("WX_EMPTY_RESPONSE");
+        try {
+            return objectMapper.readValue(body, new TypeReference<Map<String, Object>>() {});
+        } catch (Exception exception) {
+            throw new SafeCheckException("WX_INVALID_JSON_RESPONSE");
+        }
     }
 
     private Map<String, Object> classify(Map<String, Object> result) {
