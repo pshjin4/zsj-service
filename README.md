@@ -1,4 +1,13 @@
 # wxcloudrun-springboot
+
+## 微信小程序内容安全检测
+
+内容安全检测由本服务的 `/api/content-safety/check` 提供，不依赖单独部署 CloudBase 云函数。部署前，在微信云托管服务的环境变量中配置：
+
+- `WECHAT_MINIAPP_APPID`：小程序 AppID
+- `WECHAT_MINIAPP_SECRET`：小程序 AppSecret（只保存在云托管环境变量中，不要提交到代码仓库）
+
+小程序通过 `wx.cloud.callContainer` 调用此接口，云托管注入的 `X-WX-OPENID` 用于微信 `msg_sec_check` / `img_sec_check`。服务端缓存 access_token，并仅返回审核是否通过；用户文本、图片、OpenID 和 access_token 不写入日志。检测失败时按失败关闭处理，不保存未完成检测的内容。
 [![GitHub license](https://img.shields.io/github/license/WeixinCloud/wxcloudrun-express)](https://github.com/WeixinCloud/wxcloudrun-express)
 ![GitHub package.json dependency version (prod)](https://img.shields.io/badge/maven-3.6.0-green)
 ![GitHub package.json dependency version (prod)](https://img.shields.io/badge/jdk-11-green)
