@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Map;
 
 @RestController
@@ -32,8 +33,12 @@ public class ContentSecurityController {
             return ApiResponse.ok(Collections.singletonMap("code", "INVALID_INPUT"));
         } catch (Exception exception) {
             // Do not log user submitted text, image data, access tokens, or OpenIDs.
-            logger.error("WeChat content safety check failed ({})", exception.getClass().getSimpleName());
-            return ApiResponse.ok(Collections.singletonMap("code", "CHECK_UNAVAILABLE"));
+            String diagnostic = WechatContentSecurityService.diagnosticCode(exception);
+            logger.error("WeChat content safety check failed: {}", diagnostic);
+            Map<String, Object> result = new HashMap<>();
+            result.put("code", "CHECK_UNAVAILABLE");
+            result.put("diagnostic", diagnostic);
+            return ApiResponse.ok(result);
         }
     }
 }

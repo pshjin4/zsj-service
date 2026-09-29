@@ -9,6 +9,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.client.RestClientResponseException;
+import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.nio.charset.StandardCharsets;
@@ -40,6 +42,15 @@ public class WechatContentSecurityService {
         if ("text".equals(type)) return checkText(request, openid);
         if ("image".equals(type)) return checkImage(request, openid);
         throw new IllegalArgumentException("内容检测类型无效");
+    }
+
+    public static String diagnosticCode(Exception exception) {
+        if (exception instanceof SafeCheckException) return ((SafeCheckException) exception).diagnosticCode;
+        if (exception instanceof RestClientResponseException) {
+            return "WX_HTTP_ERROR_" + ((RestClientResponseException) exception).getRawStatusCode();
+        }
+        if (exception instanceof ResourceAccessException) return "WX_NETWORK_ERROR";
+        return "CHECK_FAILED";
     }
 
     private Map<String, Object> checkText(Map<String, Object> request, String openid) {
@@ -97,7 +108,7 @@ public class WechatContentSecurityService {
     private synchronized String getAccessToken() {
         if (accessToken != null && System.currentTimeMillis() < accessTokenExpiresAt) return accessToken;
         if (appId == null || appId.trim().isEmpty() || appSecret == null || appSecret.trim().isEmpty()) {
-            throw new IllegalStateException("微信内容安全服务未配置");
+            throw new SafeCheckException("CONFIG_MISSING");
         }
         String url = UriComponentsBuilder.fromHttpUrl(WECHAT_API + "/cgi-bin/token")
                 .queryParam("grant_type", "client_credential")
@@ -106,7 +117,8 @@ public class WechatContentSecurityService {
                 .toUriString();
         Map<String, Object> tokenResponse = restTemplate.getForObject(url, Map.class);
         if (tokenResponse == null || tokenResponse.get("access_token") == null) {
-            throw new IllegalStateException("获取微信接口凭证失败");
+            int errcode = tokenResponse == null ? -1 : number(tokenResponse.get("errcode"), -1);
+            throw new SafeCheckException("WX_TOKEN_ERROR_" + errcode);
         }
         accessToken = String.valueOf(tokenResponse.get("access_token"));
         int expiresIn = number(tokenResponse.get("expires_in"), 7200);
@@ -120,10 +132,10 @@ public class WechatContentSecurityService {
     }
 
     private Map<String, Object> classify(Map<String, Object> result) {
-        if (result == null) throw new IllegalStateException("微信内容安全接口无响应");
+        if (result == null) throw new SafeCheckException("WX_EMPTY_RESPONSE");
         int errcode = number(result.get("errcode"), 0);
         if (errcode == 87014) return response("CONTENT_RISK");
-        if (errcode != 0) throw new IllegalStateException("微信内容安全接口调用失败，错误码 " + errcode);
+        if (errcode != 0) throw new SafeCheckException("WX_API_ERROR_" + errcode);
         Object resultValue = result.get("result");
         if (resultValue instanceof Map) {
             Object suggest = ((Map<?, ?>) resultValue).get("suggest");
@@ -156,6 +168,14 @@ public class WechatContentSecurityService {
 
     private static Map<String, Object> response(String code) {
         return Collections.<String, Object>singletonMap("code", code);
+    }
+
+    public static final class SafeCheckException extends RuntimeException {
+        private final String diagnosticCode;
+        SafeCheckException(String diagnosticCode) {
+            super(diagnosticCode);
+            this.diagnosticCode = diagnosticCode;
+        }
     }
 
     private static String string(Object value) { return value == null ? "" : String.valueOf(value); }
