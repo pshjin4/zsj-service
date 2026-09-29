@@ -8,6 +8,8 @@
 <insert id="insertRecipe" useGeneratedKeys="true" keyProperty="id">INSERT INTO recipes(user_openid,category_id,title,description,cover_url,difficulty,cooking_time,servings,is_public) VALUES(#{userOpenid},(SELECT id FROM recipe_categories WHERE name=#{categoryName} AND (user_openid=#{userOpenid} OR user_openid IS NULL) ORDER BY user_openid IS NULL LIMIT 1),#{title},#{description},#{coverUrl},#{difficulty},#{cookingTime},#{servings},#{isPublic})</insert>
 <update id="updateRecipe">UPDATE recipes SET category_id=(SELECT id FROM recipe_categories WHERE name=#{categoryName} AND (user_openid=#{userOpenid} OR user_openid IS NULL) ORDER BY user_openid IS NULL LIMIT 1), title=#{title}, cover_url=#{coverUrl}, difficulty=#{difficulty}, cooking_time=#{cookingTime}, updated_at=CURRENT_TIMESTAMP WHERE id=#{id} AND user_openid=#{userOpenid}</update>
 <delete id="deleteRecipe">DELETE FROM recipes WHERE id=#{id} AND user_openid=#{userOpenid}</delete>
+<insert id="insertRecipeShare">INSERT IGNORE INTO recipe_shares(share_code,recipe_id,user_openid) VALUES(#{shareCode},#{recipeId},#{userOpenid})</insert>
+<select id="findRecipeShare" resultType="map">SELECT s.share_code, r.id AS recipeId, r.user_openid AS ownerOpenid FROM recipe_shares s JOIN recipes r ON r.id=s.recipe_id AND r.user_openid=s.user_openid WHERE s.share_code=#{shareCode}</select>
 <delete id="deleteIngredients">DELETE FROM recipe_ingredients WHERE recipe_id=#{recipeId}</delete>
 <delete id="deleteSteps">DELETE FROM recipe_steps WHERE recipe_id=#{recipeId}</delete>
 <delete id="deleteImages">DELETE FROM recipe_images WHERE recipe_id=#{recipeId}</delete>
@@ -25,5 +27,5 @@
 <select id="countRecipes" resultType="int">SELECT COUNT(*) FROM recipes WHERE user_openid=#{openid}</select><select id="countFavorites" resultType="int">SELECT COUNT(*) FROM recipe_favorites WHERE user_openid=#{openid}</select><select id="countRecords" resultType="int">SELECT COUNT(*) FROM cooking_records WHERE user_openid=#{openid}</select>
 <select id="categories" resultType="map">SELECT id, name, sort_order, (user_openid IS NOT NULL) AS custom FROM recipe_categories WHERE user_openid IS NULL OR user_openid=#{openid} ORDER BY sort_order, name</select>
 <select id="categoryExists" resultType="int">SELECT COUNT(*) FROM recipe_categories WHERE name=#{name} AND (user_openid IS NULL OR user_openid=#{openid})</select>
-<insert id="insertCategory">INSERT INTO recipe_categories(name,user_openid,sort_order) VALUES(#{name},#{openid},100)</insert>
+<insert id="insertCategory">INSERT IGNORE INTO recipe_categories(name,user_openid,sort_order) VALUES(#{name},#{openid},100)</insert>
 </mapper>
