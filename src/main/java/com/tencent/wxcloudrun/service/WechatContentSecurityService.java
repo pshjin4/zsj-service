@@ -50,7 +50,14 @@ public class WechatContentSecurityService {
             return "WX_HTTP_ERROR_" + ((RestClientResponseException) exception).getRawStatusCode();
         }
         if (exception instanceof ResourceAccessException) return "WX_NETWORK_ERROR";
-        return "CHECK_FAILED";
+        StackTraceElement[] trace = exception.getStackTrace();
+        if (trace.length > 0) {
+            StackTraceElement location = trace[0];
+            String owner = location.getClassName();
+            owner = owner.substring(owner.lastIndexOf('.') + 1);
+            return "CHECK_FAILED_" + exception.getClass().getSimpleName() + "_" + owner + "_" + location.getMethodName();
+        }
+        return "CHECK_FAILED_" + exception.getClass().getSimpleName();
     }
 
     private Map<String, Object> checkText(Map<String, Object> request, String openid) {
