@@ -17,7 +17,6 @@ import org.springframework.web.util.UriComponentsBuilder;
 
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Base64;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
@@ -33,6 +32,9 @@ public class WechatContentSecurityService {
 
     @Value("${WECHAT_MINIAPP_SECRET:}")
     private String appSecret;
+
+    @Value("${WECHAT_CLOUD_ENV:prod-d3gn4j2r46c8daa7e}")
+    private String cloudEnvironment;
 
     private final RestTemplate restTemplate = new RestTemplate();
     private final ObjectMapper objectMapper = new ObjectMapper();
@@ -86,14 +88,12 @@ public class WechatContentSecurityService {
     }
 
     private Map<String, Object> checkImage(Map<String, Object> request, String openid) {
-        Object encoded = request.get("imageBase64");
-        if (!(encoded instanceof String) || ((String) encoded).isEmpty()) throw new IllegalArgumentException("待检测图片无效");
-        byte[] image;
-        try {
-            image = Base64.getDecoder().decode((String) encoded);
-        } catch (IllegalArgumentException exception) {
+        Object fileIdValue = request.get("fileID");
+        if (fileIdValue == null) fileIdValue = request.get("fileId");
+        if (!(fileIdValue instanceof String) || !((String) fileIdValue).startsWith("cloud://")) {
             throw new IllegalArgumentException("待检测图片无效");
         }
+        byte[] image = downloadCloudFile((String) fileIdValue);
         if (image.length == 0 || image.length > MAX_IMAGE_BYTES) throw new IllegalArgumentException("图片大小超出限制");
         String contentType = detectImageType(image);
 
@@ -112,6 +112,35 @@ public class WechatContentSecurityService {
         Map<String, Object> result = postForMap(
                 apiUrl("/wxa/img_sec_check"), new HttpEntity<>(form, headers));
         return classify(result);
+    }
+
+    private byte[] downloadCloudFile(String fileId) {
+        if (cloudEnvironment == null || cloudEnvironment.trim().isEmpty()) {
+            throw new SafeCheckException("CLOUD_ENV_MISSING");
+        }
+        Map<String, Object> file = new java.util.HashMap<>();
+        file.put("fileid", fileId);
+        file.put("max_age", 60);
+        Map<String, Object> body = new java.util.HashMap<>();
+        body.put("env", cloudEnvironment.trim());
+        body.put("file_list", Collections.singletonList(file));
+        Map<String, Object> result = postForMap(apiUrl("/tcb/batchdownloadfile"), body);
+        int errcode = number(result.get("errcode"), -1);
+        if (errcode != 0) throw new SafeCheckException("WX_FILE_URL_ERROR_" + errcode);
+        Object filesValue = result.get("file_list");
+        if (!(filesValue instanceof List) || ((List<?>) filesValue).isEmpty()) {
+            throw new SafeCheckException("WX_FILE_URL_MISSING");
+        }
+        Object first = ((List<?>) filesValue).get(0);
+        if (!(first instanceof Map)) throw new SafeCheckException("WX_FILE_URL_MISSING");
+        Map<?, ?> fileResult = (Map<?, ?>) first;
+        String url = string(fileResult.get("download_url"));
+        if (number(fileResult.get("status"), -1) != 0 || url.isEmpty()) {
+            throw new SafeCheckException("WX_FILE_DOWNLOAD_ERROR_" + number(fileResult.get("status"), -1));
+        }
+        byte[] image = restTemplate.getForObject(url, byte[].class);
+        if (image == null || image.length == 0) throw new SafeCheckException("WX_FILE_EMPTY");
+        return image;
     }
 
     private synchronized String getAccessToken() {
